@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 import numpy as np
+import copy
 
 
 class Policy(metaclass=ABCMeta):
@@ -38,13 +39,19 @@ class Policy(metaclass=ABCMeta):
     def d_Sigmoid(cls, x):
         return (1 - cls.Sigmoid(x)) * cls.Sigmoid(x)
 
+    @classmethod
+    def tanh(self, x):
+        return np.tanh(x)
+
+    @classmethod
+    def tanh_derivative(self, x):
+        return 1 - np.tanh(x) ** 2
+
 
 class MLPPolicy(Policy):
     # For weight initialization, used He normal init.
     # For bias initialization, used Zero init.
-    def __init__(
-        self, input_n, output_n, hidden_n=16, hidden_layer_n=1, eps=0.05, gamma=0.99
-    ):
+    def __init__(self, input_n, output_n, hidden_n=16, hidden_layer_n=1, eps=0.05):
         self.input_n = input_n
         self.hidden_n = hidden_n
         self.output_n = output_n
@@ -53,7 +60,6 @@ class MLPPolicy(Policy):
         self.target_Q_layers = self._init_model()
         self.eps = eps
         self.action_n = output_n
-        self.gamma = gamma
 
     def _init_model(self):
         layers = list()
@@ -131,8 +137,8 @@ class MLPPolicy(Policy):
         if self.eps <= np.random.random():
             action = np.random.randint(0, self.action_n)
         else:
-            flat_state = np.reshape(x, (-1))
-            Q_value = self.Q.predict([flat_state])
+            flat_state = np.reshape(x, (-1))[True, :]
+            Q_value = self.predict([flat_state])
             action = np.argmax(Q_value)
 
         return action
@@ -140,20 +146,25 @@ class MLPPolicy(Policy):
     def learn(
         self, x, action, next_x, reward, done, learning_rate=1e-4, update_Q=False
     ):
+        # target_Q_layers = np.copy(self.layers)
+        # print(target_Q_layers,"target_Q_layers0")
         state = np.reshape(x, (-1))
         states = state[True, :]
         predict, update_helper = self.predict(states, update_mode=True)
+
         update_layers = list()
         if update_Q:
-            self.target_Q_layers = np.copy(self.layers)
+            self.target_Q_layers = copy.deepcopy(self.layers)
         next_states = np.reshape(next_x, (-1))[True, :]
+        # print(next_states,"next_states")
         target_Q_value = self.predict(next_states, layers=self.target_Q_layers)
+        # print(target_Q_value,"target_Q_value")
         Q_value = np.copy(predict)
         if done:
             Q_value[0, action] = reward
         else:
-            Q_value[0, action] = reward + self.gamma * np.max(target_Q_value[0])
-
+            Q_value[0, action] = reward + 0.99 * np.max(target_Q_value[0])
+        y = Q_value
         d = predict - Q_value
         cost = np.mean(np.square(d))
         d = d * 2
@@ -207,9 +218,9 @@ class MLPPolicy(Policy):
         for param in layers[:-1]:
             w, b = param
             mid_x = x @ w + b
-            x = self.ReLU(mid_x)
+            x = self.tanh(mid_x)
             if update_mode:
-                update_helper.append((prev_x, mid_x, x, self.d_ReLU))
+                update_helper.append((prev_x, mid_x, x, self.tanh_derivative))
                 prev_x = np.copy(x)
 
         w, b = layers[-1]
@@ -222,7 +233,7 @@ class MLPPolicy(Policy):
 
 
 if __name__ == "__main__":
-    p = MLPPolicy(2, 1, hidden_n=16, hidden_layer_n=3)
+    p = MLPPolicy(2, 1, hidden_n=16, hidden_layer_n=2)
     x = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
     y = np.array([[100], [0], [0], [1]])
 
