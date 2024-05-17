@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from ddqn import MLPPolicy
+from a2c_agent import A2CAgent
 
 
 def moving_average(a, window_size):
@@ -74,10 +74,6 @@ import gym
 import numpy as np
 from optimx import make
 
-# from optimxrl.Agents.dqn_agent import DQNAgent
-# from optimxrl.Agents.a2c_agent import A2CAgent
-from a2c_agent import A2CAgent
-
 
 env = gym.make("CartPole-v1")
 
@@ -85,7 +81,7 @@ env = gym.make("CartPole-v1")
 import numpy as np
 from collections import deque
 
-num_episodes = 100
+num_episodes = 10000
 
 # Global variables
 NUM_EPISODES = 1000
@@ -111,19 +107,19 @@ model_db2 = make(
 )
 
 # from nn import sigmoid
-model = A2CAgent(
-    actions=action_list,
-    input_dim=env.observation_space.shape[0],
-    actor_out_type="tanh",
-    critic_out_type="tanh",
-    actor_last_layer_type="iden",
-    critic_last_layer_type="iden",
-    hidden_dim=[32, 16],
-    model_db=model_db2,
-    int_type="xavier",  # xavier
-    eps=-0.1,
+from layers import Input, Dense
+
+_layers = [
+    Input(4),
+    Dense(units=32, activation="tanh"),
+    Dense(units=16, activation="tanh"),
+    Dense(units=2, activation="sig"),
+]
+model = A2CAgent(layers=_layers, model_db=model_db2)
+
+return_list, max_q_value_list = train_DQN(
+    model, env, num_episodes, model_id="new_linear-shima-2"
 )
-return_list, max_q_value_list = train_DQN(model, env, num_episodes, model_id="shima-8")
 
 env_name = "CartPole-v1"
 episodes_list = list(range(len(return_list)))
